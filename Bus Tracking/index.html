@@ -1,0 +1,1096 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusTrack - Universal RTC Live Bus Tracking</title>
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Main Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Splash Screen (2 seconds) -->
+  <div id="splash-screen">
+    <div class="splash-content">
+      <div class="splash-logo">🚌</div>
+      <h1 class="splash-title">BusTrack</h1>
+      <p class="splash-tagline">యూనివర్సల్ ఆర్టీసీ లైవ్ బస్ ట్రాకింగ్ • Real-time Passenger Navigator</p>
+      <div class="splash-loader"></div>
+    </div>
+  </div>
+
+  <!-- Offline Status Banner -->
+  <div id="offline-bar" class="network-status-bar"></div>
+
+  <!-- Sticky Header Navigation -->
+  <header class="app-header">
+    <div class="brand-section">
+      <a href="index.html" class="brand-logo">
+        <span class="brand-icon">🚌</span>
+        <span>BusTrack</span>
+        <span class="badge-rtc">APSRTC</span>
+      </a>
+      <select id="header-city-select" class="city-select-box input-field" data-i18n-title="citySelect">
+        <!-- Injected via JS -->
+      </select>
+    </div>
+
+    <div class="header-center">
+      <div class="quick-search-box">
+        <span class="quick-search-icon">🔍</span>
+        <input type="text" id="quick-search-input" data-i18n-placeholder="searchPlaceholder" placeholder="Search bus no, driver, route...">
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <nav class="nav-links">
+        <a href="index.html" class="nav-btn active" data-i18n="passengerPortal">Passenger</a>
+        <a href="driver.html" class="nav-btn" data-i18n="driverPortal">Driver</a>
+        <a href="admin.html" class="nav-btn" data-i18n="adminPortal">Admin</a>
+      </nav>
+      <button id="lang-toggle-btn" class="nav-btn" style="border: 1px solid var(--border-color); font-weight:700;">తెలుగు</button>
+      <button id="theme-toggle-btn" class="icon-btn" title="Toggle Light/Dark Theme">🌙</button>
+      <button id="user-profile-btn" class="user-badge-btn">
+        <span>👤</span>
+        <span id="header-username">Guest</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Live Following Top Banner -->
+  <div class="app-container">
+    <div id="live-follow-banner" class="live-follow-banner" style="display: none;">
+      <div class="live-follow-info">
+        <div class="pulse-indicator"></div>
+        <span id="follow-banner-text">Tracking AP37-1234 - ETA 12 min to Tadepalligudem</span>
+      </div>
+      <button id="stop-follow-btn" class="nav-btn" style="background: rgba(255,255,255,0.2); color: #fff;" data-i18n="unfollow">
+        Stop Tracking ✕
+      </button>
+    </div>
+
+    <!-- Dynamic Alerts Container (approaching bus, breakdowns, destination alarms) -->
+    <div id="alerts-container"></div>
+
+    <!-- Quick Saved Tabs: Home <-> College, Recents -->
+    <div class="saved-tabs-row" id="saved-chips-bar">
+      <button class="chip-btn" id="chip-home-college" data-i18n="homeCollegeFav">
+        🏠 Home ↔ 🎓 College
+      </button>
+      <button class="chip-btn" id="chip-tanuku-tp">
+        📍 Tanuku ↔ Tadepalligudem
+      </button>
+      <button class="chip-btn" id="chip-tanuku-bvrm">
+        📍 Tanuku ↔ Bhimavaram
+      </button>
+      <label class="chip-btn" style="cursor: pointer;">
+        <input type="checkbox" id="low-data-toggle" style="margin-right: 4px;">
+        <span data-i18n="lowDataMode">Low-Data Mode (15s)</span>
+      </label>
+    </div>
+
+    <!-- Home Search Card -->
+    <div class="search-card">
+      <div class="search-inputs-grid">
+        <div class="input-group">
+          <label class="input-label" data-i18n="from">From (Starting Stop)</label>
+          <input list="stops-datalist" id="from-input" class="input-field" placeholder="e.g. Tanuku">
+        </div>
+
+        <button class="swap-btn" id="swap-stops-btn" title="Swap stops" data-i18n-title="swap">⇄</button>
+
+        <div class="input-group">
+          <label class="input-label" data-i18n="to">To (Destination)</label>
+          <input list="stops-datalist" id="to-input" class="input-field" placeholder="e.g. Tadepalligudem">
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" data-i18n="date">Date</label>
+          <input type="date" id="journey-date" class="input-field">
+        </div>
+
+        <div class="input-group">
+          <label class="input-label" data-i18n="timeSlot">Time Slot</label>
+          <select id="time-slot-filter" class="input-field">
+            <option value="all" data-i18n="all">All</option>
+            <option value="morning" data-i18n="morning">Morning (06:00 - 12:00)</option>
+            <option value="evening" data-i18n="evening">Evening (12:00 - 18:00)</option>
+            <option value="night" data-i18n="night">Night (18:00 - 24:00)</option>
+          </select>
+        </div>
+
+        <div class="search-actions-group">
+          <button id="voice-search-btn" class="btn-mic" title="Telugu Voice Search (మాట్లాడండి)">🎙️</button>
+          <button id="search-buses-btn" class="btn-primary" data-i18n="searchBuses">
+            <span>🔍</span>
+            <span>Find Buses</span>
+          </button>
+        </div>
+      </div>
+      <!-- Datalist for auto-suggesting stops -->
+      <datalist id="stops-datalist"></datalist>
+
+      <!-- Telugu Voice Status Hint -->
+      <div id="voice-status" class="voice-status-hint"></div>
+    </div>
+
+    <!-- Filter & View Toggle Bar -->
+    <div class="filters-toolbar">
+      <div class="filters-left">
+        <div class="filter-item">
+          <label data-i18n="busType">Bus Type:</label>
+          <select id="filter-bus-type">
+            <option value="all">All</option>
+            <option value="Ordinary">Ordinary</option>
+            <option value="Express">Express</option>
+            <option value="Super Luxury">Super Luxury</option>
+            <option value="AC">AC</option>
+            <option value="Non-AC">Non-AC</option>
+            <option value="Sleeper">Sleeper</option>
+          </select>
+        </div>
+
+        <div class="filter-item fare-slider-wrap">
+          <label data-i18n="fare">Max Fare:</label>
+          <input type="range" id="filter-fare" min="20" max="150" step="5" value="150">
+          <span id="fare-val-display" style="font-weight:700; font-size:0.85rem;">₹150</span>
+        </div>
+
+        <div class="filter-item">
+          <label class="checkbox-label">
+            <input type="checkbox" id="filter-less-crowded">
+            <span data-i18n="lessCrowded">Less Crowded Only</span>
+          </label>
+        </div>
+
+        <div class="filter-item">
+          <label data-i18n="sortBy">Sort:</label>
+          <select id="sort-by-select">
+            <option value="eta" data-i18n="sortEta">Earliest ETA</option>
+            <option value="fare" data-i18n="sortFare">Lowest Fare</option>
+            <option value="speed" data-i18n="sortSpeed">Fastest Speed</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="view-toggle-group">
+        <button id="view-split-btn" class="view-btn active">Split</button>
+        <button id="view-list-btn" class="view-btn" data-i18n="viewList">List</button>
+        <button id="view-map-btn" class="view-btn" data-i18n="viewMap">Map</button>
+      </div>
+    </div>
+
+    <!-- Main Content Area: Bus List + Leaflet Map -->
+    <main class="main-content-layout" id="main-layout">
+      <!-- Bus Cards List Column -->
+      <section class="buses-list-pane" id="buses-container">
+        <!-- Rendered dynamically by JavaScript -->
+      </section>
+
+      <!-- Leaflet Live Map Column -->
+      <section class="map-pane">
+        <div class="map-toolbar">
+          <span id="map-status-label">🗺️ లైవ్ బస్సు మ్యాప్ • Live Fleet Map</span>
+          <div style="display:flex; gap:0.5rem;">
+            <button id="btn-my-location" class="chip-btn" data-i18n="myLocation">📍 My Location</button>
+            <button id="btn-fit-map" class="chip-btn">🔄 Reset</button>
+          </div>
+        </div>
+        <div id="map"></div>
+      </section>
+    </main>
+
+    <!-- Route Stops Detailed Timetable Section -->
+    <section class="stops-section" id="stops-section">
+      <div class="stops-header-bar">
+        <div>
+          <h3 style="font-size:1.15rem; font-weight:700;" data-i18n="stopsList">Route Stops & Timetable</h3>
+          <p style="font-size:0.85rem; color:var(--text-muted);" id="current-selected-route-info">Route: Tanuku to Tadepalligudem</p>
+        </div>
+        <div style="display:flex; gap:0.5rem; align-items:center;">
+          <input type="text" id="stop-search-filter" class="input-field" placeholder="Filter stop name..." style="padding:0.4rem 0.75rem; font-size:0.85rem; max-width:200px;">
+          <button id="btn-nearest-stops" class="btn-primary" style="height:36px; padding:0 0.8rem; font-size:0.85rem;" data-i18n="nearestStops">
+            📍 Nearest to Me
+          </button>
+        </div>
+      </div>
+      <div class="stops-timeline" id="stops-timeline-container">
+        <!-- Stops rendered dynamically -->
+      </div>
+    </section>
+
+    <!-- Community & Feedback Section -->
+    <section class="community-section">
+      <div class="community-card">
+        <h4 style="font-weight:700; margin-bottom:0.5rem;" data-i18n="community">Passenger Live Feedback</h4>
+        <p style="font-size:0.82rem; color:var(--text-muted); margin-bottom:0.75rem;">Are you travelling currently? Help fellow passengers with live updates.</p>
+        <button id="btn-passenger-confirm" class="btn-primary" style="width:100%; margin-bottom:0.75rem;" data-i18n="iamOnThisBus">
+          🙋‍♂️ I am on this bus (+1 passenger)
+        </button>
+        <span id="passenger-count-badge" style="font-size:0.8rem; color:var(--primary); font-weight:600;"></span>
+      </div>
+
+      <div class="community-card">
+        <h4 style="font-weight:700; margin-bottom:0.5rem;" data-i18n="reportIssue">Report Issue</h4>
+        <select id="report-issue-select" class="input-field" style="margin-bottom:0.5rem;">
+          <option value="Bus not running">Bus not running / Skipped stop</option>
+          <option value="Wrong location">Incorrect GPS location</option>
+          <option value="Overcrowded">Severely Overcrowded</option>
+          <option value="Breakdown">Bus Breakdown / Mechanical issue</option>
+          <option value="Other">Other issue</option>
+        </select>
+        <button id="btn-submit-report" class="chip-btn" style="width:100%; justify-content:center; background:var(--primary-light); color:var(--primary); font-weight:700;">
+          ⚠️ నివేదించండి / Submit Report
+        </button>
+      </div>
+
+      <div class="community-card">
+        <h4 style="font-weight:700; margin-bottom:0.5rem;" data-i18n="rateBus">Rate Bus Experience</h4>
+        <div class="star-rating" id="star-rating-box">
+          <span class="star" data-rating="1">★</span>
+          <span class="star" data-rating="2">★</span>
+          <span class="star" data-rating="3">★</span>
+          <span class="star" data-rating="4">★</span>
+          <span class="star" data-rating="5">★</span>
+        </div>
+        <span id="rating-feedback-text" style="font-size:0.8rem; color:var(--text-muted);">Click a star to submit feedback</span>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Fixed Emergency SOS Floating Button -->
+  <button id="sos-btn" class="sos-floating-btn" title="Emergency SOS" data-i18n="sos">
+    SOS
+  </button>
+
+  <!-- Onboarding & Login Modal -->
+  <div id="onboarding-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title" data-i18n="loginTitle">Passenger Login</h3>
+        <button id="close-login-modal" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; flex-direction:column; gap:0.85rem;">
+        <div class="input-group">
+          <label class="input-label">Language / భాష</label>
+          <select id="modal-lang-select" class="input-field">
+            <option value="te">తెలుగు (Telugu)</option>
+            <option value="en" selected>English</option>
+          </select>
+        </div>
+        <div class="input-group">
+          <label class="input-label" data-i18n="phone">Mobile Number</label>
+          <input type="tel" id="user-phone" class="input-field" placeholder="e.g. 9876543210" maxlength="10">
+        </div>
+        <div class="input-group">
+          <label class="input-label" data-i18n="otp">Enter OTP (Mock: 123456)</label>
+          <input type="text" id="user-otp" class="input-field" placeholder="123456" maxlength="6">
+        </div>
+        <div class="input-group">
+          <label class="input-label">Your Name</label>
+          <input type="text" id="user-name" class="input-field" placeholder="e.g. Ramesh">
+        </div>
+        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:0.5rem;">
+          <div class="input-group">
+            <label class="input-label">Home Stop</label>
+            <input type="text" id="user-home-stop" class="input-field" placeholder="Tanuku">
+          </div>
+          <div class="input-group">
+            <label class="input-label">College / Work</label>
+            <input type="text" id="user-college-stop" class="input-field" placeholder="Tadepalligudem">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="flex-direction:column;">
+        <button id="btn-login-submit" class="btn-primary" style="width:100%;" data-i18n="verifyLogin">
+          Verify & Save Profile
+        </button>
+        <button id="btn-guest-login" class="chip-btn" style="width:100%; justify-content:center; border:none; background:transparent;" data-i18n="guestLogin">
+          Continue as Guest
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Fare Chart & Amenities Modal -->
+  <div id="fare-chart-modal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 580px;">
+      <div class="modal-header">
+        <h3 class="modal-title">RTC Fare Stage Chart</h3>
+        <button id="close-fare-modal" class="modal-close-btn">&times;</button>
+      </div>
+      <div class="modal-body">
+        <table class="admin-table" style="margin-top:0;">
+          <thead>
+            <tr>
+              <th>Distance (km)</th>
+              <th>Ordinary</th>
+              <th>Express</th>
+              <th>Super Luxury</th>
+              <th>AC</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>0 - 10 km</td><td>₹15</td><td>₹25</td><td>₹35</td><td>₹45</td></tr>
+            <tr><td>11 - 25 km</td><td>₹35</td><td>₹45</td><td>₹60</td><td>₹75</td></tr>
+            <tr><td>26 - 50 km</td><td>₹55</td><td>₹75</td><td>₹95</td><td>₹125</td></tr>
+            <tr><td>50+ km</td><td>₹85+</td><td>₹110+</td><td>₹140+</td><td>₹180+</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- App Footer -->
+  <footer class="app-footer">
+    <div class="footer-inner">
+      <div>
+        <div style="font-weight:700; color:var(--text-main); margin-bottom:0.25rem;">
+          🚌 BusTrack Universal RTC Navigator
+        </div>
+        <p data-i18n="verifiedRTC">APSRTC / RTC Verified Fleet • Real-time Automatic Vehicle Location System</p>
+      </div>
+      <div class="footer-amenities">
+        <span>❄️ AC</span>
+        <span>📶 Free Wi-Fi</span>
+        <span>🔌 USB Charging</span>
+        <span>🧯 First Aid & SOS</span>
+      </div>
+      <div>
+        <button id="open-fare-chart-btn" class="chip-btn">📋 View Fare Chart</button>
+      </div>
+    </div>
+  </footer>
+
+  <!-- Leaflet JS CDN -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <!-- App Core JS -->
+  <script src="app.js"></script>
+
+  <!-- Passenger Specific Controller -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      // 1. Splash Screen Dismissal after 2 seconds
+      const splash = document.getElementById('splash-screen');
+      setTimeout(() => {
+        splash.classList.add('fade-out');
+      }, 2000);
+      splash.addEventListener('click', () => splash.classList.add('fade-out'));
+
+      // 2. Network status watcher & low data toggle
+      BusTrack.initNetworkWatcher();
+      const lowDataToggle = document.getElementById('low-data-toggle');
+      lowDataToggle.addEventListener('change', (e) => {
+        BusTrack.isLowDataMode = e.target.checked;
+        BusTrack.startBusSimulation(renderLiveUpdates);
+        BusTrack.showToast(`Low-data mode: updates every ${e.target.checked ? '15' : '3'} seconds`, 'info');
+      });
+
+      // 3. Language & Theme Setup
+      const savedLang = BusTrack.DB.getLang();
+      BusTrack.applyLanguage(savedLang);
+
+      const langToggleBtn = document.getElementById('lang-toggle-btn');
+      langToggleBtn.addEventListener('click', () => {
+        const nextLang = BusTrack.DB.getLang() === 'en' ? 'te' : 'en';
+        BusTrack.applyLanguage(nextLang);
+        renderBusList();
+        renderStopsTimeline();
+      });
+
+      const savedTheme = BusTrack.DB.getTheme();
+      BusTrack.applyTheme(savedTheme);
+      document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+        const currentTheme = BusTrack.DB.getTheme();
+        const nextTheme = currentTheme === 'dark' ? 'light' : 'dark';
+        BusTrack.applyTheme(nextTheme);
+      });
+
+      // 4. User Profile & Onboarding Modal
+      const user = BusTrack.DB.getUser();
+      const onboardingModal = document.getElementById('onboarding-modal');
+      const headerUsername = document.getElementById('header-username');
+
+      if (user) {
+        headerUsername.textContent = user.name || user.phone || 'User';
+      } else {
+        // Show modal if user has never logged in
+        setTimeout(() => onboardingModal.classList.add('active'), 2200);
+      }
+
+      document.getElementById('user-profile-btn').addEventListener('click', () => {
+        const currentUser = BusTrack.DB.getUser();
+        if (currentUser) {
+          document.getElementById('user-name').value = currentUser.name || '';
+          document.getElementById('user-phone').value = currentUser.phone || '';
+          document.getElementById('user-home-stop').value = currentUser.home || '';
+          document.getElementById('user-college-stop').value = currentUser.college || '';
+        }
+        onboardingModal.classList.add('active');
+      });
+
+      document.getElementById('close-login-modal').addEventListener('click', () => {
+        onboardingModal.classList.remove('active');
+      });
+
+      document.getElementById('btn-guest-login').addEventListener('click', () => {
+        BusTrack.DB.saveUser({ name: "Guest User", phone: "", home: "Tanuku", college: "Tadepalligudem" });
+        headerUsername.textContent = "Guest";
+        onboardingModal.classList.remove('active');
+        BusTrack.showToast("Logged in as Guest", "success");
+      });
+
+      document.getElementById('btn-login-submit').addEventListener('click', () => {
+        const phone = document.getElementById('user-phone').value.trim();
+        const otp = document.getElementById('user-otp').value.trim();
+        const name = document.getElementById('user-name').value.trim() || 'Passenger';
+        const home = document.getElementById('user-home-stop').value.trim() || 'Tanuku';
+        const college = document.getElementById('user-college-stop').value.trim() || 'Tadepalligudem';
+        const chosenLang = document.getElementById('modal-lang-select').value;
+
+        if (phone && otp !== '123456') {
+          alert("Invalid OTP! For testing, use OTP: 123456");
+          return;
+        }
+
+        const newUser = { phone, name, home, college };
+        BusTrack.DB.saveUser(newUser);
+        BusTrack.applyLanguage(chosenLang);
+        headerUsername.textContent = name;
+        onboardingModal.classList.remove('active');
+        BusTrack.showToast(`Welcome, ${name}! Profile saved.`, "success");
+      });
+
+      // 5. Initialize City Selector & Datalist Stops
+      const data = BusTrack.DB.get();
+      const citySelect = document.getElementById('header-city-select');
+      citySelect.innerHTML = data.cities.map(c => `<option value="${c.id}">${c.name}</option>`).join('');
+
+      // Populate Datalist
+      const stopsDatalist = document.getElementById('stops-datalist');
+      const allUniqueStops = new Set();
+      data.routes.forEach(r => r.stops.forEach(s => allUniqueStops.add(s)));
+      stopsDatalist.innerHTML = Array.from(allUniqueStops).map(s => `<option value="${s}"></option>`).join('');
+
+      // Set default journey date to today
+      const today = new Date().toISOString().split('T')[0];
+      document.getElementById('journey-date').value = today;
+
+      // 6. Quick Chips
+      document.getElementById('chip-home-college').addEventListener('click', () => {
+        const u = BusTrack.DB.getUser() || { home: 'Tanuku', college: 'Tadepalligudem' };
+        document.getElementById('from-input').value = u.home || 'Tanuku';
+        document.getElementById('to-input').value = u.college || 'Tadepalligudem';
+        executeSearch();
+      });
+
+      document.getElementById('chip-tanuku-tp').addEventListener('click', () => {
+        document.getElementById('from-input').value = 'Tanuku';
+        document.getElementById('to-input').value = 'Tadepalligudem';
+        executeSearch();
+      });
+
+      document.getElementById('chip-tanuku-bvrm').addEventListener('click', () => {
+        document.getElementById('from-input').value = 'Tanuku';
+        document.getElementById('to-input').value = 'Bhimavaram';
+        executeSearch();
+      });
+
+      // Swap button
+      document.getElementById('swap-stops-btn').addEventListener('click', () => {
+        const fromVal = document.getElementById('from-input').value;
+        const toVal = document.getElementById('to-input').value;
+        document.getElementById('from-input').value = toVal;
+        document.getElementById('to-input').value = fromVal;
+        executeSearch();
+      });
+
+      // Fare Slider
+      const fareSlider = document.getElementById('filter-fare');
+      const fareValDisplay = document.getElementById('fare-val-display');
+      fareSlider.addEventListener('input', () => {
+        fareValDisplay.textContent = `₹${fareSlider.value}`;
+        renderBusList();
+      });
+
+      // Filters changes
+      document.getElementById('filter-bus-type').addEventListener('change', renderBusList);
+      document.getElementById('filter-less-crowded').addEventListener('change', renderBusList);
+      document.getElementById('sort-by-select').addEventListener('change', renderBusList);
+      document.getElementById('header-city-select').addEventListener('change', () => {
+        executeSearch();
+      });
+
+      // Voice Search Integration
+      BusTrack.setupTeluguVoiceRecognition('voice-search-btn', (from, to, raw) => {
+        if (from) document.getElementById('from-input').value = from;
+        if (to) document.getElementById('to-input').value = to;
+        executeSearch();
+      }, 'voice-status');
+
+      // Search Action
+      document.getElementById('search-buses-btn').addEventListener('click', executeSearch);
+      document.getElementById('quick-search-input').addEventListener('input', (e) => {
+        renderBusList(e.target.value);
+      });
+
+      // 7. View Switchers: Split | List | Map
+      const mainLayout = document.getElementById('main-layout');
+      const viewSplitBtn = document.getElementById('view-split-btn');
+      const viewListBtn = document.getElementById('view-list-btn');
+      const viewMapBtn = document.getElementById('view-map-btn');
+
+      function setActiveView(mode) {
+        viewSplitBtn.classList.remove('active');
+        viewListBtn.classList.remove('active');
+        viewMapBtn.classList.remove('active');
+        mainLayout.className = 'main-content-layout';
+
+        if (mode === 'split') {
+          viewSplitBtn.classList.add('active');
+        } else if (mode === 'list') {
+          viewListBtn.classList.add('active');
+          mainLayout.classList.add('list-only');
+        } else if (mode === 'map') {
+          viewMapBtn.classList.add('active');
+          mainLayout.classList.add('map-only');
+          setTimeout(() => map.invalidateSize(), 200);
+        }
+      }
+
+      viewSplitBtn.addEventListener('click', () => setActiveView('split'));
+      viewListBtn.addEventListener('click', () => setActiveView('list'));
+      viewMapBtn.addEventListener('click', () => setActiveView('map'));
+
+      // 8. Leaflet Map Initialization
+      const map = L.map('map', {
+        center: [16.7565, 81.6811],
+        zoom: 10,
+        zoomControl: true
+      });
+
+    L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}', {
+    attribution: 'Tiles &copy; Esri'
+}).addTo(map);
+      let busMarkers = {};
+      let routePolyline = null;
+      let stopMarkersGroup = L.layerGroup().addTo(map);
+      let userMarker = null;
+
+      // User location dot
+      function updateUserLocationMarker(lat, lng) {
+        if (userMarker) {
+          userMarker.setLatLng([lat, lng]);
+        } else {
+          const userIcon = L.divIcon({
+            className: 'user-marker-dot',
+            iconSize: [16, 16],
+            iconAnchor: [8, 8]
+          });
+          userMarker = L.marker([lat, lng], { icon: userIcon }).addTo(map);
+          userMarker.bindTooltip("You are here", { permanent: false, direction: 'top' });
+        }
+      }
+
+      // My Location button
+      document.getElementById('btn-my-location').addEventListener('click', () => {
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => {
+              const { latitude, longitude } = pos.coords;
+              BusTrack.userCoordinates = [latitude, longitude];
+              updateUserLocationMarker(latitude, longitude);
+              map.setView([latitude, longitude], 12);
+              BusTrack.showToast("Location Updated!", "info");
+              renderBusList();
+            },
+            () => {
+              BusTrack.showToast("Geolocation permission not granted. Using default coordinates.", "warning");
+              updateUserLocationMarker(16.7565, 81.6811);
+            }
+          );
+        }
+      });
+
+      // Fit map button
+      document.getElementById('btn-fit-map').addEventListener('click', () => {
+        if (routePolyline) {
+          map.fitBounds(routePolyline.getBounds(), { padding: [40, 40] });
+        } else {
+          map.setView([16.7565, 81.6811], 10);
+        }
+      });
+
+      // Initial user marker
+      updateUserLocationMarker(16.7565, 81.6811);
+
+      // Stop follow bus button
+      document.getElementById('stop-follow-btn').addEventListener('click', () => {
+        BusTrack.followedBusId = null;
+        document.getElementById('live-follow-banner').style.display = 'none';
+        renderBusList();
+      });
+
+      // 9. Render Selected Route on Map (Polyline & Stops)
+      let currentSelectedRoute = data.routes[0];
+
+      function drawRouteOnMap(route) {
+        if (!route) return;
+        currentSelectedRoute = route;
+        stopMarkersGroup.clearLayers();
+
+        const stopCoords = route.stops.map(s => BusTrack.getStopCoords(s));
+
+        if (routePolyline) {
+          map.removeLayer(routePolyline);
+        }
+
+        routePolyline = L.polyline(stopCoords, {
+          color: '#1a73e8',
+          weight: 5,
+          opacity: 0.85,
+          dashArray: '8, 4'
+        }).addTo(map);
+
+        route.stops.forEach((stopName, idx) => {
+          const coords = BusTrack.getStopCoords(stopName);
+          const stopIcon = L.divIcon({
+            className: 'stop-marker-dot',
+            iconSize: [12, 12],
+            iconAnchor: [6, 6]
+          });
+          const marker = L.marker(coords, { icon: stopIcon }).addTo(stopMarkersGroup);
+          marker.bindTooltip(`<b>#${idx + 1} ${stopName}</b>`, { permanent: false, direction: 'top' });
+        });
+
+        document.getElementById('current-selected-route-info').textContent = 
+          `Route: ${route.from} ➔ ${route.to} (${route.stops.length} stops, ₹${route.fare})`;
+
+        renderStopsTimeline(route);
+      }
+
+      // 10. Render Bus List Function
+      function renderBusList(quickQuery = "") {
+        const liveData = BusTrack.DB.get();
+        const cityId = document.getElementById('header-city-select').value;
+        const fromQuery = document.getElementById('from-input').value.trim().toLowerCase();
+        const toQuery = document.getElementById('to-input').value.trim().toLowerCase();
+        const busTypeFilter = document.getElementById('filter-bus-type').value;
+        const maxFare = parseInt(document.getElementById('filter-fare').value, 10);
+        const lessCrowdedOnly = document.getElementById('filter-less-crowded').checked;
+        const sortBy = document.getElementById('sort-by-select').value;
+        const favs = BusTrack.DB.getFavorites();
+
+        let filtered = liveData.buses.filter(bus => {
+          const route = liveData.routes.find(r => r.id === bus.routeId);
+          if (!route) return false;
+
+          // Quick query from header search
+          if (quickQuery) {
+            const q = quickQuery.toLowerCase();
+            const matchesBus = bus.busNumber.toLowerCase().includes(q);
+            const matchesDriver = bus.driverName.toLowerCase().includes(q);
+            const matchesRoute = route.from.toLowerCase().includes(q) || route.to.toLowerCase().includes(q);
+            if (!matchesBus && !matchesDriver && !matchesRoute) return false;
+          }
+
+          // From & To filter
+          if (fromQuery) {
+            const hasFrom = route.stops.some(s => s.toLowerCase().includes(fromQuery));
+            if (!hasFrom) return false;
+          }
+          if (toQuery) {
+            const hasTo = route.stops.some(s => s.toLowerCase().includes(toQuery));
+            if (!hasTo) return false;
+          }
+
+          // Bus type
+          if (busTypeFilter !== 'all' && bus.busType !== busTypeFilter) return false;
+
+          // Fare filter
+          if (route.fare > maxFare) return false;
+
+          // Crowd filter
+          if (lessCrowdedOnly && bus.crowd === 'Full') return false;
+
+          return true;
+        });
+
+        // Sorting
+        filtered.sort((a, b) => {
+          const routeA = liveData.routes.find(r => r.id === a.routeId);
+          const routeB = liveData.routes.find(r => r.id === b.routeId);
+          const distA = BusTrack.calculateHaversine(BusTrack.userCoordinates[0], BusTrack.userCoordinates[1], a.lat, a.lng);
+          const distB = BusTrack.calculateHaversine(BusTrack.userCoordinates[0], BusTrack.userCoordinates[1], b.lat, b.lng);
+          const etaA = BusTrack.calculateETA(distA, a.speed);
+          const etaB = BusTrack.calculateETA(distB, b.speed);
+
+          if (sortBy === 'eta') return etaA - etaB;
+          if (sortBy === 'fare') return (routeA?.fare || 0) - (routeB?.fare || 0);
+          if (sortBy === 'speed') return b.speed - a.speed;
+          return 0;
+        });
+
+        const container = document.getElementById('buses-container');
+        if (filtered.length === 0) {
+          container.innerHTML = `
+            <div style="padding:2.5rem; text-align:center; color:var(--text-muted); background:var(--bg-card); border-radius:var(--radius-lg); border:1px solid var(--border-color);">
+              <div style="font-size:2.5rem; margin-bottom:0.5rem;">🔍</div>
+              <h4>No Buses Found</h4>
+              <p style="font-size:0.85rem; margin-top:0.25rem;">Try modifying your search criteria or stop filters.</p>
+            </div>
+          `;
+          return;
+        }
+
+        const langDict = BusTrack.LANG[BusTrack.DB.getLang()] || BusTrack.LANG.en;
+
+        container.innerHTML = filtered.map(bus => {
+          const route = liveData.routes.find(r => r.id === bus.routeId) || { from: "Tanuku", to: "Tadepalligudem", fare: 35, stops: [] };
+          const distUser = BusTrack.calculateHaversine(BusTrack.userCoordinates[0], BusTrack.userCoordinates[1], bus.lat, bus.lng);
+          const etaUser = BusTrack.calculateETA(distUser, bus.speed);
+          const nextStop = route.stops[bus.targetStopIndex] || route.to;
+          const isFav = favs.includes(bus.id);
+          const isFollowed = BusTrack.followedBusId === bus.id;
+
+          const badgeTypeClass = bus.busType.replace(/\s+/g, '-');
+
+          return `
+            <div class="bus-card ${isFollowed ? 'active-tracking' : ''}" data-bus-id="${bus.id}">
+              <div class="bus-card-top">
+                <div class="bus-number-badge">
+                  <span class="bus-no-text">${bus.busNumber}</span>
+                  <button class="fav-btn ${isFav ? 'active' : ''}" onclick="window.toggleFav('${bus.id}')" title="Save Favorite">★</button>
+                </div>
+                <div class="status-indicator ${bus.status}">
+                  <span class="dot"></span>
+                  <span>${langDict[bus.status.toLowerCase()] || bus.status}</span>
+                </div>
+              </div>
+
+              <div class="bus-card-route">
+                <span>${route.from}</span>
+                <span class="route-arrow">➔</span>
+                <span>${route.to}</span>
+              </div>
+
+              <div class="bus-badges-row">
+                <span class="badge-type ${badgeTypeClass}">${bus.busType}</span>
+                <span class="badge-crowd ${bus.crowd}">${langDict[bus.crowd.toLowerCase()] || bus.crowd}</span>
+                <span style="font-size:0.75rem; color:var(--text-muted); align-self:center;">
+                  ${route.frequency} • ₹${route.fare}
+                </span>
+              </div>
+
+              <div class="bus-card-details-grid">
+                <div class="detail-item">
+                  <span class="detail-label" data-i18n="nextStop">Next Stop</span>
+                  <span class="detail-val">${nextStop}</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">ETA to you</span>
+                  <span class="detail-val">${etaUser} mins (${distUser} km)</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label" data-i18n="speed">Speed</span>
+                  <span class="detail-val">${bus.speed} km/h</span>
+                </div>
+                <div class="detail-item">
+                  <span class="detail-label">Passengers</span>
+                  <span class="detail-val">👥 ${bus.passengers || 20} on board</span>
+                </div>
+              </div>
+
+              <div class="bus-card-footer">
+                <button class="btn-track" onclick="window.trackBus('${bus.id}')">
+                  <span>${isFollowed ? '📍 Tracking' : '📍 Track Live'}</span>
+                </button>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      // 11. Render Route Stops Timeline
+      function renderStopsTimeline(route = currentSelectedRoute) {
+        if (!route || !route.stops) return;
+        const container = document.getElementById('stops-timeline-container');
+        const filterVal = document.getElementById('stop-search-filter').value.trim().toLowerCase();
+
+        const baseTime = 7 * 60; // 07:00 AM in minutes
+
+        container.innerHTML = route.stops.map((stopName, idx) => {
+          if (filterVal && !stopName.toLowerCase().includes(filterVal)) return '';
+
+          const schedMins = baseTime + idx * 25;
+          const hrs = Math.floor(schedMins / 60).toString().padStart(2, '0');
+          const mins = (schedMins % 60).toString().padStart(2, '0');
+          const schedTime = `${hrs}:${mins} AM`;
+
+          const liveEtaMins = idx * 20;
+
+          return `
+            <div class="timeline-item">
+              <div>
+                <strong style="font-size:0.95rem;">${idx + 1}. ${stopName}</strong>
+                <div style="font-size:0.75rem; color:var(--text-muted);">Scheduled: ${schedTime}</div>
+              </div>
+              <div style="text-align:right;">
+                <span class="badge-type Express" style="font-size:0.75rem;">Live ETA: ~${liveEtaMins} min</span>
+              </div>
+            </div>
+          `;
+        }).join('');
+      }
+
+      document.getElementById('stop-search-filter').addEventListener('input', () => {
+        renderStopsTimeline(currentSelectedRoute);
+      });
+
+      // Nearest stops button
+      document.getElementById('btn-nearest-stops').addEventListener('click', () => {
+        const sortedStops = Object.keys(BusTrack.STOP_COORDINATES).map(name => {
+          const coords = BusTrack.STOP_COORDINATES[name];
+          const dist = BusTrack.calculateHaversine(BusTrack.userCoordinates[0], BusTrack.userCoordinates[1], coords[0], coords[1]);
+          return { name, dist };
+        }).sort((a, b) => a.dist - b.dist);
+
+        const nearest = sortedStops[0];
+        BusTrack.showToast(`Nearest stop: <strong>${nearest.name}</strong> (~${nearest.dist} km)`, 'info', 5000);
+      });
+
+      // 12. Update Markers on Leaflet Map
+      function updateMapBusMarkers(data) {
+        data.buses.forEach(bus => {
+          const isFollowed = BusTrack.followedBusId === bus.id;
+          const statusClass = bus.status;
+
+          const iconHtml = `
+            <div class="bus-marker-bubble ${statusClass}">
+              <span>🚌</span>
+              <span>${bus.busNumber}</span>
+            </div>
+          `;
+
+          const busIcon = L.divIcon({
+            className: 'bus-div-icon',
+            html: iconHtml,
+            iconSize: [80, 28],
+            iconAnchor: [40, 14]
+          });
+
+          const popupContent = `
+            <div class="bus-popup-box">
+              <div class="popup-header">
+                <div>
+                  <div class="popup-bus-no">${bus.busNumber}</div>
+                  <span class="badge-type ${bus.busType.replace(/\s+/g, '-')}">${bus.busType}</span>
+                </div>
+                <span class="badge-crowd ${bus.crowd}">${bus.crowd}</span>
+              </div>
+
+              <div class="popup-driver-box">
+                <div>
+                  <div><strong>${bus.driverName}</strong></div>
+                  <small style="color:var(--text-muted);">${bus.speed} km/h • ${bus.status}</small>
+                </div>
+                <a href="tel:${bus.driverPhone}" class="btn-call">📞 Call</a>
+              </div>
+
+              <div>
+                <small style="font-weight:600; color:var(--text-muted);">Upcoming Stops:</small>
+                <div class="popup-stops-preview">
+                  <li><span>1. Undrajavaram</span> <strong>~10 min</strong></li>
+                  <li><span>2. Tadepalligudem</span> <strong>~22 min</strong></li>
+                </div>
+              </div>
+
+              <div class="popup-actions-grid">
+                <button class="popup-btn primary" onclick="window.trackBus('${bus.id}')">🎯 Follow Bus</button>
+                <button class="popup-btn" onclick="window.shareTripLink('${bus.busNumber}', ${bus.lat}, ${bus.lng})">🔗 Share</button>
+                <button class="popup-btn" onclick="window.getDirections(${bus.lat}, ${bus.lng})">🧭 Directions</button>
+              </div>
+            </div>
+          `;
+
+          if (busMarkers[bus.id]) {
+            busMarkers[bus.id].setLatLng([bus.lat, bus.lng]);
+            busMarkers[bus.id].setIcon(busIcon);
+            busMarkers[bus.id].getPopup().setContent(popupContent);
+          } else {
+            const marker = L.marker([bus.lat, bus.lng], { icon: busIcon }).addTo(map);
+            marker.bindPopup(popupContent);
+            busMarkers[bus.id] = marker;
+          }
+
+          // Follow camera if currently followed
+          if (isFollowed) {
+            map.panTo([bus.lat, bus.lng], { animate: true, duration: 1.0 });
+
+            const route = data.routes.find(r => r.id === bus.routeId);
+            const banner = document.getElementById('live-follow-banner');
+            const bannerText = document.getElementById('follow-banner-text');
+            banner.style.display = 'flex';
+
+            const destName = route ? route.to : 'Destination';
+            const distToDest = route ? BusTrack.calculateHaversine(bus.lat, bus.lng, BusTrack.getStopCoords(destName)[0], BusTrack.getStopCoords(destName)[1]) : 8;
+            const etaDest = BusTrack.calculateETA(distToDest, bus.speed);
+
+            bannerText.textContent = `Tracking ${bus.busNumber} • ETA ~${etaDest} min to ${destName} • Speed ${bus.speed} km/h`;
+
+            // Destination approaching alarm (<= 2 stops away or <= 2.5 km)
+            if (distToDest <= 2.5 && !bus._alarmPlayed) {
+              bus._alarmPlayed = true;
+              BusTrack.playGetOffAlarm();
+              BusTrack.showToast(`🔔 Approaching Destination: ${destName}! Get ready to deboard.`, 'warning', 10000);
+            }
+          }
+        });
+      }
+
+      // 13. Live Updates Callback on Simulation Tick
+      function renderLiveUpdates(data) {
+        updateMapBusMarkers(data);
+        renderBusList();
+
+        // Check for breakdown or delays for alerts
+        data.buses.forEach(b => {
+          if (b.status === 'Breakdown' && !b._breakdownAlerted) {
+            b._breakdownAlerted = true;
+            BusTrack.showToast(`⚠️ Breakdown Alert: Bus ${b.busNumber} near Tanuku has stopped. Alternative Bus AP37-5678 is scheduled in 15 mins.`, 'danger', 12000);
+          }
+        });
+      }
+
+      // Execute Search
+      function executeSearch() {
+        const from = document.getElementById('from-input').value.trim();
+        const to = document.getElementById('to-input').value.trim();
+        if (from && to) {
+          BusTrack.DB.addRecentSearch({ from, to, date: new Date().toLocaleDateString() });
+        }
+
+        const matchRoute = data.routes.find(r => 
+          (from && r.from.toLowerCase().includes(from.toLowerCase())) ||
+          (to && r.to.toLowerCase().includes(to.toLowerCase()))
+        );
+
+        if (matchRoute) {
+          drawRouteOnMap(matchRoute);
+        }
+
+        renderBusList();
+      }
+
+      // Global window helpers for inline HTML button triggers
+      window.trackBus = function(busId) {
+        BusTrack.followedBusId = busId;
+        const currentData = BusTrack.DB.get();
+        const bus = currentData.buses.find(b => b.id === busId);
+        if (bus) {
+          const route = currentData.routes.find(r => r.id === bus.routeId);
+          if (route) drawRouteOnMap(route);
+
+          map.setView([bus.lat, bus.lng], 13);
+          if (busMarkers[bus.id]) {
+            busMarkers[bus.id].openPopup();
+          }
+          BusTrack.showToast(`🎯 Tracking Bus ${bus.busNumber}`, 'info');
+        }
+        renderBusList();
+        // If on small screen, switch view to map
+        if (window.innerWidth < 768) {
+          setActiveView('map');
+        }
+      };
+
+      window.toggleFav = function(busId) {
+        BusTrack.DB.toggleFavorite(busId);
+        renderBusList();
+      };
+
+      window.shareTripLink = function(busNo, lat, lng) {
+        const link = `https://www.google.com/maps?q=${lat},${lng}`;
+        const text = `Live Tracking Bus ${busNo}: ${link}`;
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text);
+          BusTrack.showToast(`🔗 Trip link copied to clipboard!`, 'success');
+        }
+      };
+
+      window.getDirections = function(lat, lng) {
+        const url = `https://www.google.com/maps/dir/?api=1&destination=${lat},${lng}`;
+        window.open(url, '_blank');
+      };
+
+      // 14. Community Actions
+      document.getElementById('btn-passenger-confirm').addEventListener('click', () => {
+        const busData = BusTrack.DB.get();
+        const targetBus = busData.buses[0];
+        if (targetBus) {
+          targetBus.passengers = (targetBus.passengers || 20) + 1;
+          BusTrack.DB.save(busData);
+          document.getElementById('passenger-count-badge').textContent = `✅ Confirmed! Total Passengers: ${targetBus.passengers}`;
+          BusTrack.showToast("Thank you for confirming passenger occupancy.", "success");
+          renderBusList();
+        }
+      });
+
+      document.getElementById('btn-submit-report').addEventListener('click', () => {
+        const issue = document.getElementById('report-issue-select').value;
+        const busData = BusTrack.DB.get();
+        const busNo = busData.buses[0]?.busNumber || "AP37-1234";
+
+        busData.reports.unshift({
+          id: "rep-" + Date.now(),
+          busNumber: busNo,
+          issue: issue,
+          date: new Date().toLocaleString(),
+          status: "Pending"
+        });
+        BusTrack.DB.save(busData);
+        BusTrack.showToast(`Report submitted: "${issue}" sent to RTC Admin`, 'info');
+      });
+
+      // Rating stars
+      const starRatingBox = document.getElementById('star-rating-box');
+      const stars = starRatingBox.querySelectorAll('.star');
+      stars.forEach(star => {
+        star.addEventListener('click', () => {
+          const rating = parseInt(star.getAttribute('data-rating'), 10);
+          stars.forEach(s => {
+            const r = parseInt(s.getAttribute('data-rating'), 10);
+            if (r <= rating) s.classList.add('selected');
+            else s.classList.remove('selected');
+          });
+          document.getElementById('rating-feedback-text').textContent = `Thank you! You rated this bus ${rating} ★`;
+          BusTrack.showToast(`Rating of ${rating} stars saved!`, 'success');
+        });
+      });
+
+      // SOS Floating Button
+      document.getElementById('sos-btn').addEventListener('click', () => {
+        const targetBus = BusTrack.DB.get().buses[0];
+        BusTrack.triggerSOS(targetBus?.busNumber, targetBus?.lat, targetBus?.lng);
+      });
+
+      // Fare Chart Modal
+      const fareModal = document.getElementById('fare-chart-modal');
+      document.getElementById('open-fare-chart-btn').addEventListener('click', () => {
+        fareModal.classList.add('active');
+      });
+      document.getElementById('close-fare-modal').addEventListener('click', () => {
+        fareModal.classList.remove('active');
+      });
+
+      // Initial Drawing & Start Simulation
+      drawRouteOnMap(currentSelectedRoute);
+      renderBusList();
+      BusTrack.startBusSimulation(renderLiveUpdates);
+    });
+  </script>
+</body>
+</html>

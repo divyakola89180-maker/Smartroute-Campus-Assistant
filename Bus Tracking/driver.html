@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="te">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>BusTrack - డ్రైవర్ పోర్టల్ / Driver Console</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    body {
+      background-color: #f1f5f9;
+    }
+    .driver-header {
+      background: #1e293b;
+      color: white;
+      padding: 0.75rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .driver-title {
+      font-size: 1.2rem;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .nav-link-badge {
+      background: rgba(255, 255, 255, 0.15);
+      color: white;
+      padding: 0.35rem 0.75rem;
+      border-radius: var(--radius-md);
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+    .score-badge {
+      background: #16a34a;
+      color: white;
+      padding: 0.5rem 1rem;
+      border-radius: var(--radius-lg);
+      font-size: 1.1rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      box-shadow: var(--shadow-sm);
+    }
+    .plus-points {
+      animation: floatUp 1.5s infinite;
+      color: #86efac;
+      font-size: 0.9rem;
+    }
+    @keyframes floatUp {
+      0% { opacity: 0; transform: translateY(5px); }
+      50% { opacity: 1; transform: translateY(-5px); }
+      100% { opacity: 0; transform: translateY(-10px); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Driver Header -->
+  <header class="driver-header">
+    <div class="driver-title">
+      <span>🚌</span>
+      <span>డ్రైవర్ డ్యాష్‌బోర్డ్ • Driver Console</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 0.75rem;">
+      <a href="index.html" class="nav-link-badge">← ప్రయాణికుల యాప్ / Passenger App</a>
+      <a href="admin.html" class="nav-link-badge">అడ్మిన్ / Admin</a>
+      <button id="driver-logout-btn" class="nav-link-badge" style="background:#dc2626; border:none; cursor:pointer; display:none;">లాగౌట్ / Logout</button>
+    </div>
+  </header>
+
+  <div class="driver-container">
+
+    <!-- Driver Login Box (Shown if not logged in) -->
+    <div id="driver-login-card" class="driver-card">
+      <div style="text-align: center; margin-bottom: 1.5rem;">
+        <div style="font-size: 3rem; margin-bottom: 0.5rem;">👨‍✈️</div>
+        <h2 style="font-size: 1.5rem; font-weight: 800;">డ్రైవర్ లాగిన్ / Driver Login</h2>
+        <p style="color: var(--text-muted); font-size: 0.9rem;">మీ నమోదిత ఫోన్ నంబర్‌తో ప్రవేశించండి</p>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 1rem;">
+        <div class="input-group">
+          <label class="input-label">మొబైల్ సంఖ్య / Phone Number</label>
+          <input type="tel" id="driver-phone" class="input-field" placeholder="ఉదా: 9989012345" value="9989012345">
+        </div>
+        <div class="input-group">
+          <label class="input-label">OTP (Mock: 123456)</label>
+          <input type="text" id="driver-otp" class="input-field" placeholder="123456" value="123456">
+        </div>
+        <button id="btn-driver-login" class="btn-primary" style="height: 50px; font-size: 1.1rem; font-weight: 700;">
+          లాగిన్ చేయండి / Verify & Login
+        </button>
+      </div>
+    </div>
+
+    <!-- Active Driver Console (Shown after login) -->
+    <div id="driver-active-console" style="display: none;">
+
+      <!-- On-time Score Card -->
+      <div class="driver-card" style="display: flex; align-items: center; justify-content: space-between;">
+        <div>
+          <h4 style="font-weight: 700; color: var(--text-main);">సమయపాలన స్కోర్ / On-Time Performance</h4>
+          <p style="font-size: 0.85rem; color: var(--text-muted);">డ్రైవర్: <strong id="console-driver-name">Raju</strong> (APSRTC Tanuku Depot)</p>
+        </div>
+        <div class="score-badge">
+          <span>95%</span>
+          <span class="plus-points">+50 pts</span>
+        </div>
+      </div>
+
+      <!-- Bus & Route Selection Card -->
+      <div class="driver-card">
+        <h3 style="font-weight: 700; margin-bottom: 1rem;">1. బస్సు & మార్గం ఎంపిక / Select Fleet</h3>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+          <div class="input-group">
+            <label class="input-label">బస్సు నంబర్ / Bus</label>
+            <select id="driver-bus-select" class="input-field">
+              <!-- Injected by JS -->
+            </select>
+          </div>
+          <div class="input-group">
+            <label class="input-label">రూట్ / Assigned Route</label>
+            <select id="driver-route-select" class="input-field">
+              <!-- Injected by JS -->
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Trip Progress & Live GPS Display -->
+      <div class="driver-card" id="trip-live-stats-card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+          <span style="font-weight: 700; font-size: 1.05rem;">📍 ప్రయాణ స్థితి / Live Trip Telematics</span>
+          <span id="trip-status-badge" class="status-indicator Running" style="font-size: 0.85rem; padding: 4px 10px;">
+            <span class="dot"></span>
+            <span id="trip-status-text">సిద్ధంగా ఉంది / Ready</span>
+          </span>
+        </div>
+
+        <div class="trip-progress-container">
+          <div style="display: flex; justify-content: space-between; font-size: 0.85rem; font-weight: 600; margin-bottom: 4px;">
+            <span id="prog-start-label">Tanuku</span>
+            <span id="prog-percent-label">0% పూర్తయింది</span>
+            <span id="prog-dest-label">Tadepalligudem</span>
+          </div>
+          <div class="trip-progress-bar-bg">
+            <div id="driver-progress-bar" class="trip-progress-fill" style="width: 0%;"></div>
+          </div>
+        </div>
+
+        <div class="bus-card-details-grid" style="grid-template-columns: repeat(3, 1fr); margin-top: 1rem; padding: 1rem;">
+          <div class="detail-item">
+            <span class="detail-label">ప్రస్తుత ప్రదేశం / Location</span>
+            <span class="detail-val" id="stat-curr-loc" style="font-size: 1rem;">Tanuku RTC Complex</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">తదుపరి స్టాప్ / Next Stop</span>
+            <span class="detail-val" id="stat-next-stop" style="font-size: 1rem; color: var(--primary);">Undrajavaram</span>
+          </div>
+          <div class="detail-item">
+            <span class="detail-label">లైవ్ వేగం / Speed</span>
+            <span class="detail-val" id="stat-speed" style="font-size: 1.1rem; color: #16a34a;">0 km/h</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Crowd Status Update Buttons -->
+      <div class="driver-card">
+        <h3 style="font-weight: 700;">2. రద్దీ వివరాలు అప్‌డేట్ చేయండి / Crowd Status</h3>
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 0.5rem;">బస్సులో ఉన్న రద్దీని ఒక్క క్లిక్‌తో అప్‌డేట్ చేయండి</p>
+        <div class="driver-crowd-row">
+          <button class="btn-crowd-driver empty" id="btn-crowd-empty" onclick="window.updateCrowd('Empty')">
+            🟢 ఖాళీ<br><small>Empty (0-30%)</small>
+          </button>
+          <button class="btn-crowd-driver half selected" id="btn-crowd-half" onclick="window.updateCrowd('Half')">
+            🟡 సగం రద్దీ<br><small>Half (30-80%)</small>
+          </button>
+          <button class="btn-crowd-driver full" id="btn-crowd-full" onclick="window.updateCrowd('Full')">
+            🔴 పూర్తి రద్దీ<br><small>Full (80-100%)</small>
+          </button>
+        </div>
+      </div>
+
+      <!-- Large Trip Controls -->
+      <div class="driver-trip-controls">
+        <button id="btn-start-trip" class="btn-driver-huge start">
+          <span>🚀 ప్రయాణం ప్రారంభించండి / START TRIP</span>
+          <span class="driver-subtext">GPS సిమ్యులేషన్ మరియు ప్రయాణీకుల ట్రాకింగ్ యాక్టివేట్ అవుతుంది</span>
+        </button>
+
+        <button id="btn-end-trip" class="btn-driver-huge stop" style="display: none;">
+          <span>🛑 ప్రయాణం ముగించండి / END TRIP</span>
+          <span class="driver-subtext">గమ్యస్థానానికి చేరుకున్నారు, ట్రిప్ కంప్లీట్ చేయండి</span>
+        </button>
+
+        <button id="btn-breakdown-trip" class="btn-driver-huge breakdown">
+          <span>⚠️ బ్రేక్‌డౌన్ / BREAKDOWN ALERT</span>
+          <span class="driver-subtext">డిపో మరియు ప్రయాణికులకు తక్షణ సహాయం నోటిఫికేషన్ వెళ్తుంది</span>
+        </button>
+      </div>
+
+    </div>
+
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const loginCard = document.getElementById('driver-login-card');
+      const activeConsole = document.getElementById('driver-active-console');
+      const logoutBtn = document.getElementById('driver-logout-btn');
+
+      const busSelect = document.getElementById('driver-bus-select');
+      const routeSelect = document.getElementById('driver-route-select');
+      const startBtn = document.getElementById('btn-start-trip');
+      const endBtn = document.getElementById('btn-end-trip');
+      const breakdownBtn = document.getElementById('btn-breakdown-trip');
+
+      let tripInterval = null;
+      let tripActive = false;
+      let tripProgress = 0;
+
+      // Check existing session
+      const savedDriver = sessionStorage.getItem('bustrack_driver');
+      if (savedDriver) {
+        showConsole(JSON.parse(savedDriver));
+      }
+
+      // Login handler
+      document.getElementById('btn-driver-login').addEventListener('click', () => {
+        const phone = document.getElementById('driver-phone').value.trim();
+        const otp = document.getElementById('driver-otp').value.trim();
+
+        if (otp !== '123456') {
+          alert("Invalid OTP! For driver testing, use OTP: 123456.");
+          return;
+        }
+
+        const driverObj = { phone, name: "Raju", id: "d1" };
+        sessionStorage.setItem('bustrack_driver', JSON.stringify(driverObj));
+        showConsole(driverObj);
+      });
+
+      logoutBtn.addEventListener('click', () => {
+        sessionStorage.removeItem('bustrack_driver');
+        if (tripInterval) clearInterval(tripInterval);
+        location.reload();
+      });
+
+      function showConsole(driver) {
+        loginCard.style.display = 'none';
+        activeConsole.style.display = 'block';
+        logoutBtn.style.display = 'inline-block';
+        document.getElementById('console-driver-name').textContent = driver.name || "Raju";
+
+        populateFleetOptions();
+      }
+
+      function populateFleetOptions() {
+        const data = BusTrack.DB.get();
+        busSelect.innerHTML = data.buses.map(b => `
+          <option value="${b.id}" ${b.id === 'b1' ? 'selected' : ''}>${b.busNumber} (${b.busType})</option>
+        `).join('');
+
+        routeSelect.innerHTML = data.routes.map(r => `
+          <option value="${r.id}" ${r.id === 'r1' ? 'selected' : ''}>${r.from} ➔ ${r.to}</option>
+        `).join('');
+
+        updateRouteInfo();
+      }
+
+      function updateRouteInfo() {
+        const data = BusTrack.DB.get();
+        const route = data.routes.find(r => r.id === routeSelect.value) || data.routes[0];
+        document.getElementById('prog-start-label').textContent = route.from;
+        document.getElementById('prog-dest-label').textContent = route.to;
+      }
+
+      routeSelect.addEventListener('change', updateRouteInfo);
+
+      // Start Trip Action
+      startBtn.addEventListener('click', () => {
+        tripActive = true;
+        startBtn.style.display = 'none';
+        endBtn.style.display = 'flex';
+
+        const data = BusTrack.DB.get();
+        const bus = data.buses.find(b => b.id === busSelect.value);
+        if (bus) {
+          bus.status = 'Running';
+          bus.speed = 36;
+          BusTrack.DB.save(data);
+        }
+
+        document.getElementById('trip-status-badge').className = 'status-indicator Running';
+        document.getElementById('trip-status-text').textContent = 'Trip Running';
+        alert("Trip started! GPS live tracking is active.");
+
+        // Start GPS progression simulation every 5-10 sec
+        if (tripInterval) clearInterval(tripInterval);
+        tripInterval = setInterval(() => {
+          if (!tripActive) return;
+
+          tripProgress += 10;
+          if (tripProgress > 100) tripProgress = 100;
+
+          document.getElementById('driver-progress-bar').style.width = tripProgress + '%';
+          document.getElementById('prog-percent-label').textContent = `${tripProgress}% Completed`;
+
+          const currentSpeed = Math.floor(32 + Math.random() * 14);
+          document.getElementById('stat-speed').textContent = `${currentSpeed} km/h`;
+
+          const liveData = BusTrack.DB.get();
+          const targetBus = liveData.buses.find(b => b.id === busSelect.value);
+          const currentRoute = liveData.routes.find(r => r.id === routeSelect.value);
+
+          if (targetBus && currentRoute) {
+            targetBus.speed = currentSpeed;
+            targetBus.status = 'Running';
+            
+            // Advance stops
+            if (tripProgress < 40) {
+              document.getElementById('stat-curr-loc').textContent = currentRoute.stops[0];
+              document.getElementById('stat-next-stop').textContent = currentRoute.stops[1] || currentRoute.to;
+            } else if (tripProgress < 85) {
+              document.getElementById('stat-curr-loc').textContent = currentRoute.stops[1] || "Highway NH16";
+              document.getElementById('stat-next-stop').textContent = currentRoute.to;
+            } else {
+              document.getElementById('stat-curr-loc').textContent = currentRoute.to + " RTC Complex";
+              document.getElementById('stat-next-stop').textContent = "Destination Reached";
+            }
+
+            BusTrack.DB.save(liveData);
+          }
+
+          if (tripProgress >= 100) {
+            clearInterval(tripInterval);
+            alert("You have reached the destination! Please end the trip.");
+          }
+        }, 5000);
+      });
+
+      // End Trip Action
+      endBtn.addEventListener('click', () => {
+        tripActive = false;
+        if (tripInterval) clearInterval(tripInterval);
+
+        startBtn.style.display = 'flex';
+        endBtn.style.display = 'none';
+
+        const data = BusTrack.DB.get();
+        const bus = data.buses.find(b => b.id === busSelect.value);
+        if (bus) {
+          bus.status = 'Stopped';
+          bus.speed = 0;
+          BusTrack.DB.save(data);
+        }
+
+        document.getElementById('trip-status-badge').className = 'status-indicator Stopped';
+        document.getElementById('trip-status-text').textContent = 'Trip Completed';
+        document.getElementById('stat-speed').textContent = '0 km/h';
+        tripProgress = 0;
+        document.getElementById('driver-progress-bar').style.width = '0%';
+        document.getElementById('prog-percent-label').textContent = '0% Completed';
+        alert("Trip completed successfully! On-time performance points credited.");
+      });
+
+      // Breakdown Action
+      breakdownBtn.addEventListener('click', () => {
+        const confirmBreakdown = confirm("Do you want to report a breakdown? An emergency alert will be dispatched to depot and passengers.");
+        if (!confirmBreakdown) return;
+
+        const data = BusTrack.DB.get();
+        const bus = data.buses.find(b => b.id === busSelect.value);
+        if (bus) {
+          bus.status = 'Breakdown';
+          bus.speed = 0;
+          BusTrack.DB.save(data);
+        }
+
+        document.getElementById('trip-status-badge').className = 'status-indicator Breakdown';
+        document.getElementById('trip-status-text').textContent = 'Breakdown';
+        document.getElementById('stat-speed').textContent = '0 km/h';
+
+        alert("Breakdown alert sent to depot! An alternate bus is being assigned.");
+      });
+
+      // Crowd Update Helper
+      window.updateCrowd = function(crowdState) {
+        document.getElementById('btn-crowd-empty').classList.remove('selected');
+        document.getElementById('btn-crowd-half').classList.remove('selected');
+        document.getElementById('btn-crowd-full').classList.remove('selected');
+
+        if (crowdState === 'Empty') document.getElementById('btn-crowd-empty').classList.add('selected');
+        if (crowdState === 'Half') document.getElementById('btn-crowd-half').classList.add('selected');
+        if (crowdState === 'Full') document.getElementById('btn-crowd-full').classList.add('selected');
+
+        const data = BusTrack.DB.get();
+        const bus = data.buses.find(b => b.id === busSelect.value);
+        if (bus) {
+          bus.crowd = crowdState;
+          BusTrack.DB.save(data);
+          alert(`Crowd status updated: ${crowdState}`);
+        }
+      };
+
+    });
+  </script>
+</body>
+</html>
